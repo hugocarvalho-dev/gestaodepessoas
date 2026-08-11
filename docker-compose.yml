@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: project_gestao_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TENANT_DB_USER:-hugo}
+      POSTGRES_PASSWORD: ${TENANT_DB_PASSWORD:-admin}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - project_gestao_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: project_gestao_pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    volumes:
+      - project_gestao_pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+volumes:
+  project_gestao_postgres_data:
+  project_gestao_pgadmin_data:

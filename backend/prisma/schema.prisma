@@ -1,0 +1,635 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model audit_log {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id  String   @db.Uuid
+  table_name  String
+  record_id   String   @db.Uuid
+  action      String
+  data_before Json?
+  data_after  Json?
+  user_id     String?  @db.Uuid
+  ip_address  String?  @db.Inet
+  user_agent  String?
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  company     company  @relation(fields: [company_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+  @@index([table_name, record_id], map: "idx_audit_log_table_record")
+  @@index([user_id], map: "idx_audit_log_user")
+}
+
+model company {
+  id              String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name            String
+  document        String?
+  phone           String?
+  address         String?
+  address_number  String?
+  complement      String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  postal_code     String?
+  country         String?        @default("BR")
+  status          String         @default("ACTIVE")
+  created_at      DateTime       @default(now()) @db.Timestamp(6)
+  updated_at      DateTime       @default(now()) @db.Timestamp(6)
+  audit_log            audit_log[]
+  cost_center          cost_center[]
+  department           department[]
+  employee             employee[]
+  position             position[]
+  position_level       position_level[]
+  userCompanies        user_company[]
+  roles                role[]
+  employee_type_config employee_type_config[]
+  contract_type_config contract_type_config[]
+  onboarding_plan      onboarding_plan[]
+  onboarding_request   onboarding_request[]
+}
+
+model onboarding_plan {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id  String    @db.Uuid
+  name        String
+  description String?
+  is_active   Boolean   @default(true)
+  fields      Json
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime  @default(now()) @db.Timestamp(6)
+  company     company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  requests    onboarding_request[]
+
+  @@index([company_id], map: "idx_onboarding_plan_company")
+  @@index([company_id, is_active], map: "idx_onboarding_plan_company_active")
+}
+
+model employee_type_config {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id  String   @db.Uuid
+  value       String
+  label       String
+  description String?
+  is_system   Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+  company     company  @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([company_id, value])
+  @@index([company_id], map: "idx_employee_type_config_company")
+}
+
+model contract_type_config {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id  String   @db.Uuid
+  value       String
+  label       String
+  description String?
+  is_system   Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+  company     company  @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([company_id, value])
+  @@index([company_id], map: "idx_contract_type_config_company")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model contract {
+  id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id      String    @db.Uuid
+  contract_type    String?
+  work_hours       String?
+  payment_category String?
+  start_date       DateTime  @db.Date
+  end_date         DateTime? @db.Date
+  created_at       DateTime  @default(now()) @db.Timestamp(6)
+  updated_at       DateTime  @default(now()) @db.Timestamp(6)
+  employee         employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salary           salary[]
+}
+
+model department {
+  id                   String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id           String                @db.Uuid
+  name                 String
+  parent_department_id String?               @db.Uuid
+  manager_employee_id  String?               @db.Uuid
+  created_at           DateTime              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime              @default(now()) @db.Timestamp(6)
+  company              company               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  department           department?           @relation("departmentTodepartment", fields: [parent_department_id], references: [id], onUpdate: NoAction)
+  other_department     department[]          @relation("departmentTodepartment")
+  employee             employee?             @relation(fields: [manager_employee_id], references: [id], onUpdate: NoAction, map: "fk_department_manager")
+  employee_department  employee_department[]
+
+  @@unique([company_id, name])
+  @@index([company_id], map: "idx_department_company")
+  @@index([parent_department_id], map: "idx_department_parent")
+}
+
+model document {
+  id                  String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id         String   @db.Uuid
+  document_type       String
+  file_url            String?
+  file_name           String?
+  file_size_bytes     Int?
+  mime_type           String?
+  description         String?
+  uploaded_by_user_id String?  @db.Uuid
+  created_at          DateTime @default(now()) @db.Timestamp(6)
+  updated_at          DateTime @default(now()) @db.Timestamp(6)
+  employee            employee @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_document_employee")
+}
+
+model education {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id     String    @db.Uuid
+  degree_level    String?
+  field_of_study  String?
+  institution     String?
+  graduation_date DateTime? @db.Date
+  created_at      DateTime  @default(now()) @db.Timestamp(6)
+  updated_at      DateTime  @default(now()) @db.Timestamp(6)
+  employee        employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model emergency_contact {
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  person_id       String   @db.Uuid
+  name            String
+  relationship    String?
+  phone           String
+  phone_secondary String?
+  email           String?
+  is_primary      Boolean? @default(false)
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+  updated_at      DateTime @default(now()) @db.Timestamp(6)
+  person          person   @relation(fields: [person_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([person_id], map: "idx_emergency_contact_person")
+}
+
+model cost_center {
+  id          String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id  String     @db.Uuid
+  name        String
+  code        String?
+  description String?
+  created_at  DateTime   @default(now()) @db.Timestamp(6)
+  updated_at  DateTime   @default(now()) @db.Timestamp(6)
+  company     company    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employee    employee[]
+
+  @@unique([company_id, name])
+  @@index([company_id], map: "idx_cost_center_company")
+}
+
+model employee {
+  id                  String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  person_id           String                @db.Uuid
+  company_id          String                @db.Uuid
+  employee_number     String?
+  employee_type       String?
+  status              String                @default("ACTIVE")
+  profilePhoto  String?
+  manager_id          String?               @db.Uuid
+  cost_center_id      String?               @db.Uuid
+  hire_date           DateTime              @db.Date
+  termination_date    DateTime?             @db.Date
+  termination_reason  String?
+  observation         String?               @db.Text
+  created_at          DateTime              @default(now()) @db.Timestamp(6)
+  updated_at          DateTime              @default(now()) @db.Timestamp(6)
+  contract            contract[]
+  department          department[]
+  document            document[]
+  education           education[]
+  company             company               @relation(fields: [company_id], references: [id], onUpdate: NoAction)
+  cost_center         cost_center?          @relation(fields: [cost_center_id], references: [id], onUpdate: NoAction)
+  employee            employee?             @relation("employeeToemployee", fields: [manager_id], references: [id], onUpdate: NoAction)
+  other_employee      employee[]            @relation("employeeToemployee")
+  person              person                @relation(fields: [person_id], references: [id], onUpdate: NoAction)
+  employee_department employee_department[]
+  employee_language   employee_language[]
+  employee_position   employee_position[]
+  employee_skill      employee_skill[]
+  work_experience     work_experience[]
+  onboarding_request  onboarding_request[]
+
+
+  @@unique([company_id, employee_number])
+  @@unique([person_id, company_id])
+  @@index([company_id], map: "idx_employee_company")
+  @@index([manager_id], map: "idx_employee_manager")
+  @@index([cost_center_id], map: "idx_employee_cost_center")
+  @@index([status], map: "idx_employee_status")
+}
+
+model onboarding_request {
+  id                  String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id          String    @db.Uuid
+  inviter_user_id     String?   @db.Uuid
+  invite_email        String
+  invite_name         String?
+  employee_type_value String?
+  onboarding_plan_id  String?   @db.Uuid
+  token_hash          String    @unique
+  public_token        String?
+  token_expires_at    DateTime  @db.Timestamp(6)
+  status              String    @default("PENDING")
+  required_fields     Json?
+  submitted_data      Json?
+  submitted_at        DateTime? @db.Timestamp(6)
+  reviewed_by_user_id String?   @db.Uuid
+  reviewed_at         DateTime? @db.Timestamp(6)
+  review_notes        String?
+  created_employee_id String?   @db.Uuid
+  created_at          DateTime  @default(now()) @db.Timestamp(6)
+  updated_at          DateTime  @default(now()) @db.Timestamp(6)
+  company             company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onboarding_plan     onboarding_plan? @relation(fields: [onboarding_plan_id], references: [id], onUpdate: NoAction)
+  employee            employee? @relation(fields: [created_employee_id], references: [id], onUpdate: NoAction)
+
+  @@index([company_id, status], map: "idx_onboarding_request_company_status")
+  @@index([token_expires_at], map: "idx_onboarding_request_token_expires")
+  @@index([onboarding_plan_id], map: "idx_onboarding_request_plan")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model employee_department {
+  id            String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id   String     @db.Uuid
+  department_id String     @db.Uuid
+  start_date    DateTime   @db.Date
+  end_date      DateTime?  @db.Date
+  is_primary    Boolean?   @default(true)
+  created_at    DateTime   @default(now()) @db.Timestamp(6)
+  department    department @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employee      employee   @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id, department_id], map: "idx_employee_department_current", where: raw("(end_date IS NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model employee_language {
+  id                     String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id            String   @db.Uuid
+  language_id            String   @db.Uuid
+  proficiency_level      String?
+  proficiency_percentage Int?
+  created_at             DateTime @default(now()) @db.Timestamp(6)
+  updated_at             DateTime @default(now()) @db.Timestamp(6)
+  employee               employee @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  language               language @relation(fields: [language_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, language_id])
+  @@index([employee_id], map: "idx_employee_language_employee")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model employee_position {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id String    @db.Uuid
+  position_id String    @db.Uuid
+  start_date  DateTime  @db.Date
+  end_date    DateTime? @db.Date
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  employee    employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  position    position  @relation(fields: [position_id], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id, position_id], map: "idx_employee_position_current", where: raw("(end_date IS NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model employee_skill {
+  id                  String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id         String   @db.Uuid
+  skill_id            String   @db.Uuid
+  proficiency_level   Int?
+  years_of_experience Decimal? @db.Decimal(4, 1)
+  created_at          DateTime @default(now()) @db.Timestamp(6)
+  updated_at          DateTime @default(now()) @db.Timestamp(6)
+  employee            employee @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  skill               skill    @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, skill_id])
+  @@index([employee_id], map: "idx_employee_skill_employee")
+}
+
+model family_info {
+  id                   String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  person_id            String    @unique @db.Uuid
+  marital_status       String?
+  spouse_name          String?
+  spouse_birthday      DateTime? @db.Date
+  number_of_dependents Int?      @default(0)
+  created_at           DateTime  @default(now()) @db.Timestamp(6)
+  updated_at           DateTime  @default(now()) @db.Timestamp(6)
+  person               person    @relation(fields: [person_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model language {
+  id                String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name              String              @unique
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
+  employee_language employee_language[]
+}
+
+model person {
+  id                String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  legal_name        String
+  preferred_name    String?
+  photo_url         String?
+  date_of_birth     DateTime?           @db.Date
+  gender            String?
+  nationality       String?
+  marital_status    String?
+  government_id     String?
+  passport          String?             // RG number
+  rg_issuer         String?
+  rg_state          String?
+  rg_issue_date     DateTime?           @db.Date
+  ssn               String?             // CNH number
+  cnh_category      String?
+  cnh_issue_date    DateTime?           @db.Date
+  cnh_expiry_date   DateTime?           @db.Date
+  cnh_issuer        String?
+  cnh_state         String?
+  mother_name              String?
+  ethnicity                String?
+  pis                      String?
+  education_level          String?
+  has_food_intolerance     Boolean?  @default(false)
+  food_intolerance         String?
+  has_medication_allergy   Boolean?  @default(false)
+  medication_allergy       String?
+  created_at               DateTime            @default(now()) @db.Timestamp(6)
+  updated_at               DateTime            @default(now()) @db.Timestamp(6)
+  emergency_contact emergency_contact[]
+  employee          employee[]
+  family_info       family_info?
+  personal_contact  personal_contact[]
+}
+
+model personal_contact {
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  person_id       String   @db.Uuid
+  email           String?  // email corporativo
+  personal_email  String?  // email pessoal
+  phone           String?  // telefone pessoal
+  corporate_phone String?  // telefone corporativo
+  address            String?
+  address_number     String?
+  address_complement String?
+  neighborhood       String?
+  city               String?
+  state              String?
+  country            String?
+  postal_code        String?
+  is_primary      Boolean? @default(true)
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+  updated_at      DateTime @default(now()) @db.Timestamp(6)
+  person          person   @relation(fields: [person_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([person_id], map: "idx_personal_contact_person")
+}
+
+model position {
+  id                  String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id          String                @db.Uuid
+  name                String
+  position_level_id   String?               @db.Uuid
+  description         String?               @db.Text
+  deleted_at          DateTime?             @db.Timestamp(6)
+  created_at          DateTime              @default(now()) @db.Timestamp(6)
+  updated_at          DateTime              @default(now()) @db.Timestamp(6)
+  employee_position   employee_position[]
+  company             company               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  position_level      position_level?       @relation(fields: [position_level_id], references: [id], onUpdate: NoAction)
+
+  @@unique([company_id, name, position_level_id])
+  @@index([position_level_id], map: "idx_position_level")
+}
+
+model position_level {
+  id         String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  company_id String     @db.Uuid
+  name       String
+  created_at DateTime   @default(now()) @db.Timestamp(6)
+  updated_at DateTime   @default(now()) @db.Timestamp(6)
+  company    company    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  position   position[]
+
+  @@unique([company_id, name])
+  @@index([company_id], map: "idx_position_level_company")
+}
+
+
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model salary {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  contract_id String    @db.Uuid
+  amount      Decimal   @db.Decimal(12, 2)
+  currency    String    @default("BRL")
+  start_date  DateTime  @db.Date
+  end_date    DateTime? @db.Date
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  contract    contract  @relation(fields: [contract_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([contract_id], map: "idx_salary_current", where: raw("(end_date IS NULL)"))
+}
+
+model skill {
+  id             String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name           String           @unique
+  category       String?
+  created_at     DateTime         @default(now()) @db.Timestamp(6)
+  employee_skill employee_skill[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model work_experience {
+  id            String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  employee_id   String    @db.Uuid
+  company_name  String?
+  position_name String?
+  start_date    DateTime? @db.Date
+  end_date      DateTime? @db.Date
+  description   String?
+  is_current    Boolean?  @default(false)
+  created_at    DateTime  @default(now()) @db.Timestamp(6)
+  updated_at    DateTime  @default(now()) @db.Timestamp(6)
+  employee      employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model user {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  email       String    @unique
+  password    String
+  firstName   String
+  lastName    String
+  status      String    @default("ACTIVE")
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime? @db.Timestamp(6)
+  createdAt   DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamp(6)
+
+  // Relacionamentos
+  userCompanies user_company[]
+  userRoles     user_role[]
+  settings      user_settings?
+
+  // Audit
+  createdBy String? @db.Uuid
+  updatedBy String? @db.Uuid
+
+  @@index([email])
+  @@index([status])
+  @@index([isActive])
+  @@map("users")
+}
+
+model user_settings {
+  id                  String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId              String  @unique @db.Uuid
+  theme               String  @default("light") // "light" | "dark"
+  emailNotifications  Boolean @default(true)
+  birthdayReminders   Boolean @default(true)
+  anniversaryReminders Boolean @default(true)
+  customColors        Json?   // { primary, accent, background, surface, surfaceAlt, muted }
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model user_company {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId    String   @db.Uuid
+  companyId String   @db.Uuid
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  user    user    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Um usuário pode ter múltiplos papéis na mesma empresa
+  userRoles user_role[]
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("user_companies")
+}
+
+model resource {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String   @unique // employees, departments, positions, contracts, companies, users, etc
+  displayName String // "Funcionários", "Departamentos", etc
+  description String?
+  icon        String? // Para o frontend
+  order       Int? // Ordem de exibição
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+
+  permissions permission[]
+
+  @@map("resources")
+}
+
+model action {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String   @unique // create, read, update, delete, manage, approve, etc
+  displayName String // "Criar", "Visualizar", "Editar", "Excluir", "Gerenciar", etc
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+
+  permissions permission[]
+
+  @@map("actions")
+}
+
+model permission {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  resourceId  String   @db.Uuid
+  actionId    String   @db.Uuid
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+
+  resource resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  action   action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  rolePermissions role_permission[]
+
+  @@unique([resourceId, actionId])
+  @@index([resourceId])
+  @@index([actionId])
+  @@map("permissions")
+}
+
+model role {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String // "Admin", "Gerente RH", "Visualizador", etc
+  description String?
+  companyId   String?  @db.Uuid // Se NULL, é role global (para todas empresas)
+  isSystem    Boolean  @default(false) // Roles que não podem ser deletadas/excluidas
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+
+  company     company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userRoles   user_role[]
+  permissions role_permission[]
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("roles")
+}
+
+model role_permission {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+
+  role       role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model user_role {
+  id            String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId        String   @db.Uuid
+  roleId        String   @db.Uuid
+  userCompanyId String   @db.Uuid // Referência à empresa específica
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime @updatedAt @db.Timestamp(6)
+
+  user        user         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  userCompany user_company @relation(fields: [userCompanyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, userCompanyId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([userCompanyId])
+  @@map("user_roles")
+}

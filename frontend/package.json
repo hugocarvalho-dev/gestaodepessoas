@@ -1,0 +1,43 @@
+{
+  "name": "rh-manager-nextjs",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@date-io/date-fns": "^3.2.1",
+    "@emotion/react": "11.14.0",
+    "@emotion/styled": "11.14.1",
+    "@mui/icons-material": "7.3.5",
+    "@mui/material": "7.3.5",
+    "@mui/x-date-pickers": "^8.27.2",
+    "@popperjs/core": "2.11.8",
+    "autoprefixer": "^10.4.27",
+    "date-fns": "3.6.0",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
+    "lucide-react": "0.487.0",
+    "motion": "12.23.24",
+    "next": "16.1.6",
+    "postcss": "^8.5.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-hook-form": "7.55.0",
+    "recharts": "2.15.2",
+    "sonner": "2.0.3",
+    "tailwindcss": "^3.4.19",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.6",
+    "@types/react-dom": "19.0.2",
+    "eslint": "9.18.0",
+    "eslint-config-next": "16.1.6",
+    "typescript": "5.7.3"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "project-gestao-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/stop-dev.ps1"
+  }
+}

@@ -1,0 +1,29 @@
+# Dependencies
+**/node_modules/
+
+# Environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build outputs and caches
+**/dist/
+**/.next/
+**/coverage/
+**/*.tsbuildinfo
+
+# Logs and local run artifacts
+**/logs/
+*.log
+.codex-run-logs/
+
+# Local editor/tool state
+.config/
+.vscode/
+
+# Runtime uploads
+backend/src/uploads/
+backend/storage/uploads/
+
+# Database backups
+.db-backups/

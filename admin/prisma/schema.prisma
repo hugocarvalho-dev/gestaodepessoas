@@ -1,0 +1,271 @@
+// ─────────────────────────────────────────────────────────────
+// MASTER DATABASE SCHEMA — Multi-Tenant Admin
+// Este schema controla o banco MASTER (admin) que gerencia
+// todos os tenants (clientes) do sistema SaaS.
+// Cada tenant possui seu próprio banco PostgreSQL isolado.
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/admin-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// TENANT (Cliente)
+// Representa um cliente/organização que usa o sistema.
+// Cada tenant tem seu próprio banco de dados isolado.
+// ─────────────────────────────────────────────────────────────
+model tenant {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug            String          @unique                          // Identificador único para URL (subdomínio)
+  name            String                                           // Razão Social
+  trade_name      String?                                          // Nome Fantasia
+  document        String?         @unique                          // CNPJ/CPF
+  email           String                                           // E-mail principal
+  phone           String?                                          // Telefone
+  logo_url        String?                                          // URL do logotipo
+
+  // Endereço
+  address         String?
+  address_number  String?
+  complement      String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  postal_code     String?
+  country         String?         @default("BR")
+
+  // Banco de dados do tenant
+  database_name   String          @unique                          // Nome do banco: tenant_<slug>
+  database_host   String?                                          // Host (se diferente do padrão)
+  database_port   Int?            @default(5432)                   // Porta
+
+  // Status & controle
+  status          tenant_status   @default(TRIAL)
+  max_employees   Int             @default(50)                     // Limite de colaboradores no plano
+  max_users       Int             @default(5)                      // Limite de usuários no plano
+
+  // Datas
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+  updated_at      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+  activated_at    DateTime?       @db.Timestamp(6)                 // Quando foi ativado
+  suspended_at    DateTime?       @db.Timestamp(6)                 // Quando foi suspenso
+  cancelled_at    DateTime?       @db.Timestamp(6)                 // Quando foi cancelado
+  trial_ends_at   DateTime?       @db.Timestamp(6)                 // Fim do período trial
+
+  // Relações
+  subscription    subscription?
+  payments        payment[]
+  companies       tenant_company[]
+  admin_notes     admin_note[]
+  audit_logs      tenant_audit_log[]
+
+  @@index([status], map: "idx_tenant_status")
+  @@index([document], map: "idx_tenant_document")
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUBSCRIPTION (Assinatura/Plano do tenant)
+// ─────────────────────────────────────────────────────────────
+model subscription {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String              @unique @db.Uuid
+  plan              subscription_plan   @default(STARTER)
+  price_monthly     Decimal             @default(0) @db.Decimal(10, 2)
+  billing_cycle     billing_cycle       @default(MONTHLY)
+  status            subscription_status @default(ACTIVE)
+
+  // Datas de vigência
+  started_at        DateTime            @default(now()) @db.Timestamp(6)
+  current_period_start DateTime?        @db.Timestamp(6)
+  current_period_end   DateTime?        @db.Timestamp(6)
+  cancelled_at      DateTime?           @db.Timestamp(6)
+
+  // Controle de pagamento externo (Stripe, etc.)
+  external_id       String?                                        // ID no gateway (stripe_sub_xxx)
+  external_customer String?                                        // ID do customer no gateway
+
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
+  updated_at        DateTime            @default(now()) @updatedAt @db.Timestamp(6)
+
+  tenant            tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([status], map: "idx_subscription_status")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAYMENT (Histórico de pagamentos)
+// ─────────────────────────────────────────────────────────────
+model payment {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String          @db.Uuid
+  amount          Decimal         @db.Decimal(10, 2)
+  currency        String          @default("BRL")
+  status          payment_status  @default(PENDING)
+  payment_method  String?                                          // PIX, BOLETO, CARTAO, etc.
+  reference       String?                                          // Referência/código do pagamento
+  external_id     String?                                          // ID no gateway de pagamento
+  description     String?
+  paid_at         DateTime?       @db.Timestamp(6)
+  due_date        DateTime?       @db.Timestamp(6)
+  invoice_url     String?                                          // URL da fatura/nota fiscal
+
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+  updated_at      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  tenant          tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_payment_tenant")
+  @@index([status], map: "idx_payment_status")
+  @@index([due_date], map: "idx_payment_due_date")
+}
+
+// ─────────────────────────────────────────────────────────────
+// TENANT_COMPANY (Empresas que o tenant possui)
+// Controle de quais empresas existem dentro do banco do tenant.
+// ─────────────────────────────────────────────────────────────
+model tenant_company {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String          @db.Uuid
+  company_name    String                                           // Nome da empresa
+  company_document String?                                         // CNPJ
+  is_headquarters Boolean         @default(false)                  // É a matriz?
+  status          String          @default("ACTIVE")
+
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+  updated_at      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  tenant          tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_tenant_company_tenant")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN_NOTE (Notas internas do admin sobre o tenant)
+// ─────────────────────────────────────────────────────────────
+model admin_note {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String          @db.Uuid
+  author          String                                           // Admin que escreveu
+  content         String
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+
+  tenant          tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id], map: "idx_admin_note_tenant")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN_USER (Usuários da plataforma admin — super admins)
+// ─────────────────────────────────────────────────────────────
+model admin_user {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String          @unique
+  password_hash   String
+  name            String
+  role            admin_role      @default(OPERATOR)
+  status          String          @default("ACTIVE")
+  last_login_at   DateTime?       @db.Timestamp(6)
+
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+  updated_at      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  audit_logs      tenant_audit_log[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// TENANT_AUDIT_LOG (Auditoria de ações no painel admin)
+// ─────────────────────────────────────────────────────────────
+model tenant_audit_log {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String?         @db.Uuid
+  admin_user_id   String?         @db.Uuid
+  action          String                                           // CREATE_TENANT, SUSPEND_TENANT, etc.
+  details         Json?
+  ip_address      String?         @db.Inet
+  created_at      DateTime        @default(now()) @db.Timestamp(6)
+
+  tenant          tenant?         @relation(fields: [tenant_id], references: [id])
+  admin_user      admin_user?     @relation(fields: [admin_user_id], references: [id])
+
+  @@index([tenant_id], map: "idx_tenant_audit_tenant")
+  @@index([admin_user_id], map: "idx_tenant_audit_admin")
+  @@index([created_at(sort: Desc)], map: "idx_tenant_audit_created")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLAN (Planos configuráveis da plataforma)
+// Modelo de plano que pode ser atribuído a tenants.
+// Substitui o enum fixo por registros dinâmicos.
+// ─────────────────────────────────────────────────────────────
+model plan {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String          @unique                          // Ex: Starter, Professional, Enterprise
+  description       String?                                          // Descrição do plano
+  max_employees     Int             @default(50)                     // Limite de colaboradores
+  max_users         Int             @default(5)                      // Limite de usuários gestores
+  max_companies     Int             @default(1)                      // Limite de empresas
+  price_monthly     Decimal         @default(0) @db.Decimal(10, 2)  // Preço mensal
+  price_yearly      Decimal         @default(0) @db.Decimal(10, 2)  // Preço anual
+  is_trial          Boolean         @default(false)                  // É plano trial?
+  trial_days        Int             @default(0)                      // Dias de trial (se aplicável)
+  features          Json?                                            // Lista de features do plano (JSON)
+  is_active         Boolean         @default(true)                   // Plano disponível para venda?
+  sort_order        Int             @default(0)                      // Ordem de exibição
+
+  created_at        DateTime        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@index([is_active], map: "idx_plan_active")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+enum tenant_status {
+  TRIAL               // Em período de teste
+  ACTIVE              // Ativo e pago
+  SUSPENDED           // Suspenso (inadimplência, etc.)
+  CANCELLED           // Cancelado pelo cliente
+  INACTIVE            // Desativado pelo admin
+}
+
+enum subscription_plan {
+  STARTER             // Plano inicial
+  PROFESSIONAL        // Plano profissional
+  ENTERPRISE          // Plano empresarial
+  CUSTOM              // Plano personalizado
+}
+
+enum billing_cycle {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum subscription_status {
+  ACTIVE
+  PAST_DUE            // Pagamento em atraso
+  CANCELLED
+  PAUSED
+}
+
+enum payment_status {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum admin_role {
+  SUPER_ADMIN         // Acesso total
+  ADMIN               // Gerência de tenants
+  OPERATOR            // Operador (visualização + ações limitadas)
+  VIEWER              // Somente visualização
+}
