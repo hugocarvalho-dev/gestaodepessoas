@@ -420,6 +420,9 @@ export class OnboardingService {
       position: position.name,
       manager_id: manager.id,
       manager_name: manager.person?.legal_name || null,
+      // E-mail corporativo: vem do convite e nao tem campo no formulario
+      // publico, por isso precisa estar no preset.
+      email: dto.invite_email,
       personal_email: dto.personal_email,
       hire_date: dto.hire_date,
       legal_name: dto.invite_name,
@@ -596,6 +599,14 @@ export class OnboardingService {
       manager_id: currentData.manager_id,
       manager_name: currentData.manager_name,
     };
+
+    // O e-mail corporativo nao e editavel no formulario publico: se nao veio
+    // no preset (convites criados antes disso) nem no envio, usa o do convite,
+    // senao o submit falharia por "campo obrigatorio ausente" sem que o
+    // colaborador tenha como preencher.
+    if (!String(mergedData.email ?? '').trim()) {
+      mergedData.email = invite.invite_email;
+    }
 
     const requiredFields = (invite.required_fields as string[]) || DEFAULT_REQUIRED_FIELDS;
     const missing = requiredFields.filter((field) => {

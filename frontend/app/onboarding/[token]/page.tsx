@@ -255,12 +255,21 @@ export default function PublicOnboardingPage() {
         }
 
         setFormMeta(data);
-        const baseFormData = data.submitted_data || {
+        // A API sempre devolve submitted_data como objeto (com os campos
+        // definidos pelo RH), entao os valores vindos do convite entram como
+        // base e sao complementados por ele — nunca como alternativa.
+        const submitted = (data.submitted_data || {}) as Record<string, any>;
+        const isBlank = (value: any) => value === undefined || value === null || String(value).trim() === '';
+        const baseFormData: Record<string, any> = {
           legal_name: data.invite_name || '',
           email: data.invite_email || '',
           employee_type: data.employee_type_value || '',
           country: 'Brasil',
         };
+
+        for (const [key, value] of Object.entries(submitted)) {
+          if (!isBlank(value) || isBlank(baseFormData[key])) baseFormData[key] = value;
+        }
 
         setFormData(baseFormData);
         setErrorType(null);
@@ -270,10 +279,12 @@ export default function PublicOnboardingPage() {
           if (draftRaw) {
             const draft = JSON.parse(draftRaw);
             if (draft?.version === STORAGE_VERSION) {
-              setFormData({
-                ...baseFormData,
-                ...(draft.formData || {}),
-              });
+              const draftData = (draft.formData || {}) as Record<string, any>;
+              const restored: Record<string, any> = { ...baseFormData };
+              for (const [key, value] of Object.entries(draftData)) {
+                if (!isBlank(value) || isBlank(restored[key])) restored[key] = value;
+              }
+              setFormData(restored);
               setEmergencyContacts(draft.emergencyContacts?.length ? draft.emergencyContacts : [{ name: '', relationship: '', phone: '' }]);
               setEducationItems(
                 draft.educationItems?.length
