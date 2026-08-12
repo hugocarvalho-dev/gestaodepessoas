@@ -67,17 +67,23 @@ export class FamilyInfoService {
         throw new BadRequestException('Person not found in this company');
       }
 
-      const familyInfo = await this.prisma.family_info.create({
-        data: {
-          person_id: createData.person_id,
-          marital_status: createData.marital_status || null,
-          spouse_name: createData.spouse_name || null,
-          spouse_birthday: createData.spouse_birthday ? new Date(createData.spouse_birthday) : null,
-          number_of_dependents: createData.number_of_dependents != null ? Number(createData.number_of_dependents) : null,
-        },
+      // family_info e 1:1 com person (person_id e unique), entao o POST e
+      // idempotente: se a pessoa ja tem o registro, atualiza em vez de falhar
+      // com violacao de constraint.
+      const values = {
+        marital_status: createData.marital_status || null,
+        spouse_name: createData.spouse_name || null,
+        spouse_birthday: createData.spouse_birthday ? new Date(createData.spouse_birthday) : null,
+        number_of_dependents: createData.number_of_dependents != null ? Number(createData.number_of_dependents) : null,
+      };
+
+      const familyInfo = await this.prisma.family_info.upsert({
+        where: { person_id: createData.person_id },
+        create: { person_id: createData.person_id, ...values },
+        update: { ...values, updated_at: new Date() },
       });
 
-      this.logger.log(`Family info created: ${familyInfo.id}`);
+      this.logger.log(`Family info saved: ${familyInfo.id}`);
       return familyInfo;
     } catch (error) {
       this.logger.error(`Error creating family info: ${error.message}`);
@@ -103,11 +109,12 @@ export class FamilyInfoService {
           ...(data.spouse_name !== undefined && { spouse_name: data.spouse_name || null }),
           ...(data.spouse_birthday !== undefined && { spouse_birthday: data.spouse_birthday ? new Date(data.spouse_birthday) : null }),
           ...(data.number_of_dependents !== undefined && { number_of_dependents: data.number_of_dependents != null ? Number(data.number_of_dependents) : null }),
+          updated_at: new Date(),
         },
       });
 
       this.logger.log(`Family info updated: ${id}`);
-      return familyInfo;
+      return updated;
     } catch (error) {
       if (error.code === 'P2025') {
         throw new NotFoundException('Family info not found');
