@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateEmployeeLanguageDto } from './dto/employee-language.dto';
+import { CreateEmployeeLanguageDto, ProficiencyLevel } from './dto/employee-language.dto';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { PaginatedResponse } from '@/common/dto/paginated.response';
 
@@ -65,7 +65,7 @@ export class EmployeeLanguageService {
         data: {
           employee_id: data.employee_id,
           language_id: data.language_id,
-          proficiency_level: data.proficiency_level || 'INTERMEDIATE',
+          proficiency_level: data.proficiency_level || ProficiencyLevel.INTERMEDIARIO,
         },
         include: { language: true },
       });

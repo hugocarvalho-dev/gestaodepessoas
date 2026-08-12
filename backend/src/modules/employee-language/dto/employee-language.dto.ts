@@ -2,12 +2,14 @@ import { PartialType } from '@nestjs/mapped-types';
 import { IsString, IsOptional, IsUUID, IsEnum, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// Valores em portugues, iguais aos enviados pelos formularios de
+// colaborador e de onboarding e aos exibidos na tela de detalhe.
 export enum ProficiencyLevel {
-  BEGINNER = 'BEGINNER',
-  INTERMEDIATE = 'INTERMEDIATE',
-  ADVANCED = 'ADVANCED',
-  FLUENT = 'FLUENT',
-  NATIVE = 'NATIVE',
+  BASICO = 'BASICO',
+  INTERMEDIARIO = 'INTERMEDIARIO',
+  AVANCADO = 'AVANCADO',
+  FLUENTE = 'FLUENTE',
+  NATIVO = 'NATIVO',
 }
 
 export class CreateEmployeeLanguageDto {
