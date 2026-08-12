@@ -43,6 +43,7 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
     "@nestjs/testing": "^11.1.14",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.3.0",
@@ -52,5 +53,12 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "@nestjs/core@11.1.14": true,
+    "@prisma/engines@7.4.2": true,
+    "@scarf/scarf@1.4.0": true,
+    "esbuild@0.27.3": true,
+    "prisma@7.4.2": true
   }
 }

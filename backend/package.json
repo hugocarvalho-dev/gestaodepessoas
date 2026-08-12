@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
     "@nestjs/testing": "^11.1.14",
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^30.0.0",
@@ -86,5 +87,13 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "allowScripts": {
+    "@nestjs/core@11.1.13": true,
+    "@prisma/engines@7.4.0": true,
+    "esbuild@0.27.3": true,
+    "prisma@7.4.0": true,
+    "unrs-resolver@1.11.1": true,
+    "@scarf/scarf@1.4.0": true
   }
 }
